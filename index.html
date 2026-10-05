@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>QR Cajas</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1d4ed8">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+  :root{
+    --bg:#f5f6f8; --card:#ffffff; --ink:#111827; --muted:#6b7280; --line:#e5e7eb;
+    --brand:#1d4ed8; --brand-ink:#ffffff; --ok:#15803d; --err:#b91c1c; --err-bg:#fef2f2;
+  }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+    --bg:#0f1115; --card:#181b22; --ink:#f3f4f6; --muted:#9ca3af; --line:#2a2f3a;
+    --brand:#3b82f6; --ok:#4ade80; --err:#f87171; --err-bg:#2a1515; } }
+  :root[data-theme="dark"]{
+    --bg:#0f1115; --card:#181b22; --ink:#f3f4f6; --muted:#9ca3af; --line:#2a2f3a;
+    --brand:#3b82f6; --ok:#4ade80; --err:#f87171; --err-bg:#2a1515; }
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+       padding-inline:16px;padding-block:0 32px;max-width:560px;margin-inline:auto}
+  header{display:flex;align-items:center;justify-content:space-between;padding-block:14px 10px}
+  h1{font-size:20px;margin:0}
+  .pill{font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+  .pill.on{color:var(--ok);border-color:var(--ok)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-block:12px}
+  label{display:block;font-size:14px;color:var(--muted);margin-bottom:6px}
+  input[type=password],input[type=text],textarea{width:100%;font-size:18px;padding:12px;border:1px solid var(--line);
+       border-radius:10px;background:var(--bg);color:var(--ink)}
+  textarea{font-size:13px;font-family:ui-monospace,monospace;min-height:90px}
+  .chk{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--muted);margin-block:10px}
+  button{font-size:17px;font-weight:600;padding:14px;border-radius:12px;border:0;width:100%;cursor:pointer;
+         background:var(--brand);color:var(--brand-ink);margin-top:8px}
+  button.sec{background:transparent;color:var(--brand);border:1.5px solid var(--brand)}
+  button.ghost{background:transparent;color:var(--muted);border:1px solid var(--line);font-weight:500;font-size:15px}
+  .row2{display:flex;gap:10px}
+  .row2>*{flex:1}
+  .err{color:var(--err);background:var(--err-bg);border-radius:10px;padding:10px 12px;font-size:14px;margin-top:10px}
+  .msg{color:var(--muted);font-size:14px;margin-top:8px;min-height:1.4em}
+  #visor{position:relative;width:100%;aspect-ratio:1/1;max-width:100%;background:#000;border-radius:12px;overflow:hidden}
+  #visor video{width:100%;height:100%;object-fit:cover}
+  #visor .marco{position:absolute;inset:14%;border:3px solid rgba(255,255,255,.85);border-radius:14px;pointer-events:none}
+  .res-caja{font-size:34px;font-weight:800;letter-spacing:.5px;margin:0 0 4px}
+  .res-sub{color:var(--muted);font-size:14px;margin-bottom:12px}
+  .kv{display:grid;grid-template-columns:1fr auto;gap:8px 16px;border-top:1px solid var(--line);padding-top:10px}
+  .kv .k{color:var(--muted);font-size:14px}
+  .kv .v{font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+  .kv .v.big{font-size:22px;color:var(--brand)}
+  .hist{list-style:none;padding:0;margin:0}
+  .hist li{display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
+  .hist li:first-child{border-top:0}
+  .hist .t{color:var(--muted)}
+  footer{color:var(--muted);font-size:12px;text-align:center;margin-top:20px}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <h1>QR Cajas</h1>
+  <span id="pill" class="pill">bloqueado</span>
+</header>
+
+<!-- 1. Clave -->
+<section id="s-clave" class="card">
+  <label for="clave">Clave del depósito</label>
+  <input id="clave" type="password" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="escribí la clave">
+  <div class="chk"><input id="ver-clave" type="checkbox"><label for="ver-clave" style="margin:0">Mostrar clave</label></div>
+  <div class="chk"><input id="recordar" type="checkbox"><label for="recordar" style="margin:0">Recordar en este teléfono</label></div>
+  <button id="btn-desbloquear">Desbloquear</button>
+  <div id="err-clave" class="err" hidden></div>
+  <div id="diag" class="msg">Si este texto no cambia, el archivo se abrió sin JavaScript. Abrilo con Chrome.</div>
+</section>
+
+<!-- 2. Escaneo -->
+<section id="s-scan" class="card" hidden>
+  <div id="visor"><video id="video" playsinline muted autoplay></video><div class="marco"></div></div>
+  <div id="msg-scan" class="msg">Apuntá la cámara al QR de la caja</div>
+  <div class="row2">
+    <button id="btn-cam" class="sec">Encender cámara</button>
+    <button id="btn-foto" class="sec">Tomar foto</button>
+  </div>
+  <input id="foto" type="file" accept="image/*" capture="environment" hidden>
+  <button id="btn-pegar" class="ghost">Pegar texto del QR</button>
+  <div id="pegar-box" hidden>
+    <textarea id="pegar" placeholder="BQ1.…"></textarea>
+    <button id="btn-descifrar-texto" class="sec">Descifrar</button>
+  </div>
+  <div id="err-scan" class="err" hidden></div>
+</section>
+
+<!-- 3. Resultado -->
+<section id="s-res" class="card" hidden>
+  <p id="res-caja" class="res-caja"></p>
+  <div id="res-sub" class="res-sub"></div>
+  <div id="res-kv" class="kv"></div>
+  <button id="btn-otra">Escanear otra caja</button>
+</section>
+
+<!-- 4. Historial -->
+<section id="s-hist" class="card" hidden>
+  <label>Últimas lecturas en este teléfono</label>
+  <ul id="hist" class="hist"></ul>
+  <button id="btn-limpiar" class="ghost">Borrar historial</button>
+</section>
+
+<footer>Funciona sin conexión. Los datos se descifran solo en este teléfono. <span id="ver">v3</span></footer>
+
+<script src="sjcl.js"></script>
+<script src="jsQR.js"></script>
+<script>
+// Cualquier error de JavaScript se muestra en pantalla (no hay consola en el celular).
+window.onerror = function (msg, src, line) {
+  var e = document.getElementById("err-clave");
+  if (e) { e.hidden = false; e.textContent = "Error interno: " + msg + " (línea " + line + ")"; }
+};
+window.onunhandledrejection = function (ev) {
+  var e = document.getElementById("err-clave"), r = ev && ev.reason;
+  if (e) { e.hidden = false; e.textContent = "Error interno: " + (r && r.message ? r.message : r); }
+};
+(() => {
+  // ---- mismos parámetros que generar_qr.py ----
+  const SAL = new TextEncoder().encode("BCRA-QR-CAJAS-v1");
+  const ITER = 100000;
+  const PREFIJO = "BQ1.";
+  const LS_KEY = "qr_cajas_key", LS_HIST = "qr_cajas_hist";
+
+  const $ = (id) => document.getElementById(id);
+  const pill = $("pill");
+  let key = null, stream = null, scanning = false, detector = null;
+
+  // ---------- utilidades ----------
+  const fmtN = (n) => Number(n).toLocaleString("es-AR");
+  const fmt$ = (n) => "$ " + Number(n).toLocaleString("es-AR");
+  const b64urlToBytes = (s) => {
+    s = s.replace(/-/g, "+").replace(/_/g, "/"); s += "=".repeat((4 - s.length % 4) % 4);
+    const bin = atob(s); const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  };
+  const setErr = (id, txt) => { const e = $(id); e.textContent = txt || ""; e.hidden = !txt; };
+
+  // Motor de cifrado: WebCrypto del navegador (https) o SJCL en JS puro (archivo local, http).
+  const SUBTLE = !!(window.crypto && crypto.subtle);
+  const SJCL = typeof sjcl !== "undefined" && !!(sjcl.mode && sjcl.mode.gcm && sjcl.misc && sjcl.misc.pbkdf2);
+  if (!SUBTLE && !SJCL) {
+    setErr("err-clave", "Este navegador no puede descifrar. Probá con Chrome.");
+    $("btn-desbloquear").disabled = true;
+  }
+  $("diag").textContent = "Motor: " + (SUBTLE ? "navegador" : SJCL ? "propio (JS)" : "ninguno")
+    + " · origen: " + location.protocol.replace(":", "") + " · lector QR: " + (typeof jsQR === "function" ? "sí" : "no")
+    + " · " + (navigator.userAgent.match(/Chrome\/\d+|Firefox\/\d+|Safari\/\d+|wv/g) || ["navegador ?"]).join(" ");
+  $("ver-clave").onchange = () => { $("clave").type = $("ver-clave").checked ? "text" : "password"; };
+  const aHex = (u8) => Array.from(u8, (b) => b.toString(16).padStart(2, "0")).join("");
+  const deHex = (h) => Uint8Array.from(h.match(/../g), (x) => parseInt(x, 16));
+
+  // ---------- clave (siempre 32 bytes crudos) ----------
+  async function derivar(frase) {
+    if (SUBTLE) {
+      const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(frase), "PBKDF2", false, ["deriveBits"]);
+      const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt: SAL, iterations: ITER, hash: "SHA-256" }, base, 256);
+      return new Uint8Array(bits);
+    }
+    const salBits = sjcl.codec.utf8String.toBits("BCRA-QR-CAJAS-v1");
+    return deHex(sjcl.codec.hex.fromBits(sjcl.misc.pbkdf2(frase, salBits, ITER, 256)));
+  }
+  async function guardarKey(k) { try { localStorage.setItem(LS_KEY, aHex(k)); } catch {} }
+  async function cargarKey() {
+    try { const h = localStorage.getItem(LS_KEY); return h && h.length === 64 ? deHex(h) : null; } catch { return null; }
+  }
+  async function aesGcmAbrir(k, nonce, ct) {
+    if (SUBTLE) {
+      const ck = await crypto.subtle.importKey("raw", k, { name: "AES-GCM" }, false, ["decrypt"]);
+      return new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: nonce }, ck, ct));
+    }
+    const aes = new sjcl.cipher.aes(sjcl.codec.hex.toBits(aHex(k)));
+    const plano = sjcl.mode.gcm.decrypt(aes, sjcl.codec.hex.toBits(aHex(ct)), sjcl.codec.hex.toBits(aHex(nonce)), [], 128);
+    return deHex(sjcl.codec.hex.fromBits(plano));
+  }
+  window.__qrTest = { derivar, aesGcmAbrir, motor: () => (SUBTLE ? "webcrypto" : SJCL ? "sjcl" : "ninguno") };
+  function desbloqueado() {
+    $("s-clave").hidden = true; $("s-scan").hidden = false; $("s-hist").hidden = false;
+    pill.textContent = "desbloqueado"; pill.classList.add("on");
+    pintarHist();
+    encenderCamara();
+  }
+  $("btn-desbloquear").onclick = async () => {
+    const frase = $("clave").value;
+    if (!frase) { setErr("err-clave", "Escribí la clave."); return; }
+    setErr("err-clave", ""); $("btn-desbloquear").textContent = "Verificando… (unos segundos)";
+    $("btn-desbloquear").disabled = true;
+    await new Promise((r) => setTimeout(r, 60));  // deja que la pantalla se repinte antes del cálculo
+    try {
+      key = await derivar(frase);
+      try { if ($("recordar").checked) await guardarKey(key); else localStorage.removeItem(LS_KEY); } catch {}
+      desbloqueado();
+    } catch (e) { setErr("err-clave", "No se pudo desbloquear en este navegador: " + (e && e.message || e)); }
+    $("btn-desbloquear").textContent = "Desbloquear"; $("btn-desbloquear").disabled = false;
+  };
+  $("clave").addEventListener("keydown", (e) => { if (e.key === "Enter") $("btn-desbloquear").click(); });
+
+  // ---------- descifrado ----------
+  async function descifrar(texto) {
+    texto = (texto || "").trim();
+    if (!texto.startsWith(PREFIJO)) throw new Error("Este QR no es de una caja (formato desconocido).");
+    let blob;
+    try { blob = b64urlToBytes(texto.slice(PREFIJO.length)); } catch { throw new Error("QR dañado o mal leído. Probá de nuevo."); }
+    if (blob.length < 12 + 16 + 2) throw new Error("QR incompleto.");
+    let plano;
+    try {
+      plano = await aesGcmAbrir(key, blob.slice(0, 12), blob.slice(12));
+    } catch { throw new Error("No se pudo descifrar: la clave es incorrecta o el QR es de otro sistema."); }
+    return JSON.parse(new TextDecoder().decode(plano));
+  }
+
+  function mostrar(d) {
+    apagarCamara();
+    $("s-scan").hidden = true; $("s-res").hidden = false;
+    $("res-caja").textContent = d.caja || "(sin número)";
+    const total = (d.den && d.cant) ? d.den * d.cant : null;
+    $("res-sub").textContent = d.fecha ? "Armada el " + d.fecha : "";
+    const filas = [];
+    if (d.den) filas.push(["Billetes de", fmt$(d.den)]);
+    if (d.cant) filas.push(["Cantidad", fmtN(d.cant) + " billetes"]);
+    if (total) filas.push(["Total", fmt$(total), "big"]);
+    if (d.desde) filas.push(["Serie desde", d.desde]);
+    if (d.hasta) filas.push(["Serie hasta", d.hasta]);
+    for (const [k, v] of Object.entries(d))
+      if (!["caja", "den", "cant", "desde", "hasta", "fecha"].includes(k)) filas.push([k, String(v)]);
+    $("res-kv").innerHTML = filas.map(([k, v, c]) =>
+      `<div class="k">${k}</div><div class="v ${c || ""}">${v}</div>`).join("");
+    agregarHist(d);
+  }
+  async function procesarTexto(texto) {
+    try { setErr("err-scan", ""); mostrar(await descifrar(texto)); }
+    catch (e) { setErr("err-scan", e.message); if (!scanning) $("msg-scan").textContent = "Probá de nuevo"; }
+  }
+  $("btn-otra").onclick = () => { $("s-res").hidden = true; $("s-scan").hidden = false; setErr("err-scan", ""); encenderCamara(); };
+
+  // ---------- cámara ----------
+  const video = $("video");
+  async function encenderCamara() {
+    if (stream) return;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      $("msg-scan").textContent = "Sin acceso a cámara en vivo: usá «Tomar foto»."; return;
+    }
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 1280 } }, audio: false });
+      video.srcObject = stream; await video.play();
+      if ("BarcodeDetector" in window) { try { detector = new BarcodeDetector({ formats: ["qr_code"] }); } catch { detector = null; } }
+      scanning = true; $("btn-cam").textContent = "Apagar cámara";
+      $("msg-scan").textContent = "Apuntá la cámara al QR de la caja";
+      requestAnimationFrame(loop);
+    } catch (e) {
+      $("msg-scan").textContent = "Cámara no disponible aquí (" + e.name + "). Usá «Tomar foto».";
+    }
+  }
+  function apagarCamara() {
+    scanning = false;
+    if (stream) { stream.getTracks().forEach((t) => t.stop()); stream = null; video.srcObject = null; }
+    $("btn-cam").textContent = "Encender cámara";
+  }
+  $("btn-cam").onclick = () => (stream ? apagarCamara() : encenderCamara());
+
+  const canvas = document.createElement("canvas"), ctx = canvas.getContext("2d", { willReadFrequently: true });
+  let ultimo = 0, ultimoTexto = "", ultimoT = 0;
+  async function loop(ts) {
+    if (!scanning) return;
+    if (ts - ultimo > 120 && video.readyState >= 2) {
+      ultimo = ts;
+      let texto = null;
+      try {
+        if (detector) { const r = await detector.detect(video); if (r.length) texto = r[0].rawValue; }
+        else texto = leerConJsQR(video, video.videoWidth, video.videoHeight);
+      } catch {}
+      if (texto && !(texto === ultimoTexto && ts - ultimoT < 3000)) {
+        ultimoTexto = texto; ultimoT = ts;
+        if (navigator.vibrate) navigator.vibrate(60);
+        await procesarTexto(texto);
+        if (!scanning) return;
+      }
+    }
+    requestAnimationFrame(loop);
+  }
+  function leerConJsQR(src, w, h) {
+    const max = 800, esc = Math.min(1, max / Math.max(w, h));
+    canvas.width = Math.round(w * esc); canvas.height = Math.round(h * esc);
+    ctx.drawImage(src, 0, 0, canvas.width, canvas.height);
+    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const r = jsQR(img.data, img.width, img.height, { inversionAttempts: "dontInvert" });
+    return r ? r.data : null;
+  }
+
+  // ---------- foto ----------
+  $("btn-foto").onclick = () => $("foto").click();
+  $("foto").onchange = async () => {
+    const f = $("foto").files[0]; if (!f) return;
+    $("msg-scan").textContent = "Leyendo foto…"; setErr("err-scan", "");
+    try {
+      const bmp = await createImageBitmap(f);
+      let texto = null;
+      if ("BarcodeDetector" in window) { try { const r = await new BarcodeDetector({ formats: ["qr_code"] }).detect(bmp); if (r.length) texto = r[0].rawValue; } catch {} }
+      if (!texto) texto = leerConJsQR(bmp, bmp.width, bmp.height);
+      if (!texto) { for (const max of [1400, 2000]) { texto = leerEscalado(bmp, max); if (texto) break; } }
+      bmp.close && bmp.close();
+      if (!texto) throw new Error("No se encontró un QR en la foto. Acercate más y que quede nítido.");
+      await procesarTexto(texto);
+    } catch (e) { setErr("err-scan", e.message); }
+    $("foto").value = ""; $("msg-scan").textContent = "Apuntá la cámara al QR de la caja";
+  };
+  function leerEscalado(bmp, max) {
+    const esc = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    canvas.width = Math.round(bmp.width * esc); canvas.height = Math.round(bmp.height * esc);
+    ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const r = jsQR(img.data, img.width, img.height, { inversionAttempts: "attemptBoth" });
+    return r ? r.data : null;
+  }
+
+  // ---------- pegar texto ----------
+  $("btn-pegar").onclick = () => { $("pegar-box").hidden = !$("pegar-box").hidden; };
+  $("btn-descifrar-texto").onclick = () => procesarTexto($("pegar").value);
+
+  // ---------- historial ----------
+  function leerHist() { try { return JSON.parse(localStorage.getItem(LS_HIST) || "[]"); } catch { return []; } }
+  function agregarHist(d) {
+    const h = leerHist();
+    h.unshift({ caja: d.caja, den: d.den, cant: d.cant, t: new Date().toISOString() });
+    try { localStorage.setItem(LS_HIST, JSON.stringify(h.slice(0, 50))); } catch {}
+    pintarHist();
+  }
+  function pintarHist() {
+    const h = leerHist();
+    $("hist").innerHTML = h.length ? h.map((x) => {
+      const t = new Date(x.t);
+      const hora = t.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" }) + " " + t.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+      return `<li><span><b>${x.caja}</b> · ${fmtN(x.cant)} × ${fmt$(x.den)}</span><span class="t">${hora}</span></li>`;
+    }).join("") : `<li class="t">Todavía no se leyó ninguna caja.</li>`;
+  }
+  $("btn-limpiar").onclick = () => { try { localStorage.removeItem(LS_HIST); } catch {} pintarHist(); };
+
+  // ---------- conexión / service worker ----------
+  function estadoRed() { document.title = navigator.onLine ? "QR Cajas" : "QR Cajas (sin conexión)"; }
+  addEventListener("online", estadoRed); addEventListener("offline", estadoRed); estadoRed();
+  if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
+  document.addEventListener("visibilitychange", () => { if (document.hidden) apagarCamara(); else if (!$("s-scan").hidden && key) encenderCamara(); });
+
+  // ---------- arranque ----------
+  (async () => {
+    if (SUBTLE || SJCL) { key = await cargarKey(); if (key) { $("recordar").checked = true; desbloqueado(); } }
+  })();
+})();
+</script>
+</body>
+</html>
