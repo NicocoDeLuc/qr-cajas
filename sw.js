@@ -1,8 +1,8 @@
 /* Service worker: deja la app completa guardada en el teléfono.
    Estrategia: responde desde caché (funciona sin red) y, si hay red,
    baja la versión nueva en segundo plano para la próxima apertura. */
-const CACHE = "qr-cajas-v4";
-const ARCHIVOS = ["./", "./index.html", "./jsQR.js", "./sjcl.js", "./manifest.json", "./icon-192.png", "./icon-512.png"];
+const CACHE = "qr-cajas-v5";
+const ARCHIVOS = ["./", "./index.html", "./jsQR.js", "./sjcl.js", "./zxing.js", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ARCHIVOS)).then(() => self.skipWaiting()));
