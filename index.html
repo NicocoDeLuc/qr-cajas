@@ -91,6 +91,7 @@
     <button id="btn-descifrar-texto" class="sec">Descifrar</button>
   </div>
   <div id="err-scan" class="err" hidden></div>
+  <button id="btn-cambiar-clave" class="ghost">Cambiar clave</button>
 </section>
 
 <!-- 3. Resultado -->
@@ -108,7 +109,7 @@
   <button id="btn-limpiar" class="ghost">Borrar historial</button>
 </section>
 
-<footer>Funciona sin conexión. Los datos se descifran solo en este teléfono. <span id="ver">v5</span></footer>
+<footer>Funciona sin conexión. Los datos se descifran solo en este teléfono. <span id="ver">v6</span></footer>
 
 <script src="sjcl.js"></script>
 <script src="jsQR.js"></script>
@@ -127,7 +128,8 @@ window.onunhandledrejection = function (ev) {
   // ---- mismos parámetros que generar_qr.py ----
   const SAL = new TextEncoder().encode("BCRA-QR-CAJAS-v1");
   const ITER = 100000;
-  const PREFIJO = "BQ1.";
+  const PREFIJO = "BQ1.", PREFIJO2 = "BQ2.";
+  let keyCheck = "";  // 4 hex: primeros 2 bytes de SHA-256(clave), para detectar clave incorrecta
   const LS_KEY = "qr_cajas_key", LS_HIST = "qr_cajas_hist";
 
   const $ = (id) => document.getElementById(id);
@@ -183,14 +185,28 @@ window.onunhandledrejection = function (ev) {
     return deHex(sjcl.codec.hex.fromBits(plano));
   }
   window.__qrTest = { derivar, aesGcmAbrir, motor: () => (SUBTLE ? "webcrypto" : SJCL ? "sjcl" : "ninguno"), leerFoto: (b) => leerFoto(b), leerVivo: (s, w, h) => leerConJsQR(s, w, h) };
-  function desbloqueado() {
+  async function controlClave(k) {
+    if (SUBTLE) return aHex(new Uint8Array(await crypto.subtle.digest("SHA-256", k)).slice(0, 2));
+    return sjcl.codec.hex.fromBits(sjcl.hash.sha256.hash(sjcl.codec.hex.toBits(aHex(k)))).slice(0, 4);
+  }
+  async function desbloqueado() {
+    keyCheck = await controlClave(key);
     $("s-clave").hidden = true; $("s-scan").hidden = false; $("s-hist").hidden = false;
     pill.textContent = "desbloqueado"; pill.classList.add("on");
     pintarHist();
     encenderCamara();
   }
+  $("btn-cambiar-clave").onclick = () => {
+    apagarCamara(); key = null; keyCheck = "";
+    try { localStorage.removeItem(LS_KEY); } catch {}
+    $("recordar").checked = false; $("clave").value = ""; setErr("err-scan", ""); setErr("err-clave", "");
+    $("s-scan").hidden = true; $("s-res").hidden = true; $("s-hist").hidden = true; $("s-clave").hidden = false;
+    pill.textContent = "bloqueado"; pill.classList.remove("on");
+    $("btn-cambiar-clave").classList.add("ghost"); $("btn-cambiar-clave").classList.remove("sec");
+    $("clave").focus();
+  };
   $("btn-desbloquear").onclick = async () => {
-    const frase = $("clave").value;
+    const frase = $("clave").value.trim();
     if (!frase) { setErr("err-clave", "Escribí la clave."); return; }
     setErr("err-clave", ""); $("btn-desbloquear").textContent = "Verificando… (unos segundos)";
     $("btn-desbloquear").disabled = true;
@@ -207,14 +223,21 @@ window.onunhandledrejection = function (ev) {
   // ---------- descifrado ----------
   async function descifrar(texto) {
     texto = (texto || "").trim();
-    if (!texto.startsWith(PREFIJO)) throw new Error("Este QR no es de una caja (formato desconocido).");
+    let off;
+    if (texto.startsWith(PREFIJO2)) off = 2;        // v2: 2 bytes de control de clave + nonce + datos
+    else if (texto.startsWith(PREFIJO)) off = 0;    // v1: nonce + datos
+    else throw new Error("Este QR no es de una caja (formato desconocido).");
     let blob;
-    try { blob = b64urlToBytes(texto.slice(PREFIJO.length)); } catch { throw new Error("QR dañado o mal leído. Probá de nuevo."); }
-    if (blob.length < 12 + 16 + 2) throw new Error("QR incompleto.");
+    try { blob = b64urlToBytes(texto.slice(4)); } catch { throw new Error("QR dañado o mal leído. Probá de nuevo."); }
+    if (blob.length < off + 12 + 16 + 2) throw new Error("QR incompleto.");
+    if (off && aHex(blob.slice(0, 2)) !== keyCheck) {
+      $("btn-cambiar-clave").classList.add("sec"); $("btn-cambiar-clave").classList.remove("ghost");
+      throw new Error("La clave guardada en este teléfono no es la de este QR. Tocá «Cambiar clave» y escribila de nuevo, sin tildes ni espacios.");
+    }
     let plano;
     try {
-      plano = await aesGcmAbrir(key, blob.slice(0, 12), blob.slice(12));
-    } catch { throw new Error("No se pudo descifrar: la clave es incorrecta o el QR es de otro sistema."); }
+      plano = await aesGcmAbrir(key, blob.slice(off, off + 12), blob.slice(off + 12));
+    } catch { throw new Error(off ? "QR dañado: no se pudo descifrar aunque la clave es la correcta." : "No se pudo descifrar: la clave es incorrecta o el QR es de otro sistema."); }
     return JSON.parse(new TextDecoder().decode(plano));
   }
 
