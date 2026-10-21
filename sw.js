@@ -2,7 +2,8 @@
    Estrategia: responde desde caché (funciona sin red) y, si hay red,
    baja la versión nueva en segundo plano para la próxima apertura. */
 const CACHE = "qr-cajas-v7";
-const ARCHIVOS = ["./", "./index.html", "./jsQR.js", "./sjcl.js", "./zxing.js", "./manifest.json", "./icon-192.png", "./icon-512.png"];
+const PREFIJO = "qr-cajas-v";   // solo se borran cachés viejas de ESTA app (la versión china comparte origen en github.io)
+const ARCHIVOS =["./", "./index.html", "./jsQR.js", "./sjcl.js", "./zxing.js", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ARCHIVOS)).then(() => self.skipWaiting()));
@@ -10,7 +11,7 @@ self.addEventListener("install", (e) => {
 
 self.addEventListener("activate", (e) => {
   e.waitUntil(
-    caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+    caches.keys().then((ks) => Promise.all(ks.filter((k) => k.startsWith(PREFIJO) && k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
