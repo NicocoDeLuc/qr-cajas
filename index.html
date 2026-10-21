@@ -109,7 +109,7 @@
   <button id="btn-limpiar" class="ghost">Borrar historial</button>
 </section>
 
-<footer>Funciona sin conexión. Los datos se descifran solo en este teléfono. <span id="ver">v6</span></footer>
+<footer>Funciona sin conexión. Los datos se descifran solo en este teléfono. <span id="ver">v7</span></footer>
 
 <script src="sjcl.js"></script>
 <script src="jsQR.js"></script>
@@ -241,20 +241,25 @@ window.onunhandledrejection = function (ev) {
     return JSON.parse(new TextDecoder().decode(plano));
   }
 
+  // Nombres de campo completos (denominacion, cantidad, serie_desde, serie_hasta); se aceptan
+  // también los abreviados de los primeros QR de prueba (den, cant, desde, hasta).
+  const CAMPOS_FIJOS = ["caja", "denominacion", "cantidad", "serie_desde", "serie_hasta", "fecha", "den", "cant", "desde", "hasta"];
   function mostrar(d) {
     apagarCamara();
     $("s-scan").hidden = true; $("s-res").hidden = false;
+    const den = d.denominacion ?? d.den, cant = d.cantidad ?? d.cant;
+    const desde = d.serie_desde ?? d.desde, hasta = d.serie_hasta ?? d.hasta;
     $("res-caja").textContent = d.caja || "(sin número)";
-    const total = (d.den && d.cant) ? d.den * d.cant : null;
+    const total = (den && cant) ? den * cant : null;
     $("res-sub").textContent = d.fecha ? "Armada el " + d.fecha : "";
     const filas = [];
-    if (d.den) filas.push(["Billetes de", fmt$(d.den)]);
-    if (d.cant) filas.push(["Cantidad", fmtN(d.cant) + " billetes"]);
+    if (den) filas.push(["Billetes de", fmt$(den)]);
+    if (cant) filas.push(["Cantidad", fmtN(cant) + " billetes"]);
     if (total) filas.push(["Total", fmt$(total), "big"]);
-    if (d.desde) filas.push(["Serie desde", d.desde]);
-    if (d.hasta) filas.push(["Serie hasta", d.hasta]);
+    if (desde) filas.push(["Serie desde", desde]);
+    if (hasta) filas.push(["Serie hasta", hasta]);
     for (const [k, v] of Object.entries(d))
-      if (!["caja", "den", "cant", "desde", "hasta", "fecha"].includes(k)) filas.push([k, String(v)]);
+      if (!CAMPOS_FIJOS.includes(k)) filas.push([k, String(v)]);
     $("res-kv").innerHTML = filas.map(([k, v, c]) =>
       `<div class="k">${k}</div><div class="v ${c || ""}">${v}</div>`).join("");
     agregarHist(d);
