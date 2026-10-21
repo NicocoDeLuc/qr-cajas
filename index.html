@@ -109,7 +109,7 @@
   <button id="btn-limpiar" class="ghost">Borrar historial</button>
 </section>
 
-<footer>Funciona sin conexión. Los datos se descifran solo en este teléfono. <span id="ver">v7</span></footer>
+<footer>Funciona sin conexión. Los datos se descifran solo en este teléfono. <span id="ver">v8</span></footer>
 
 <script src="sjcl.js"></script>
 <script src="jsQR.js"></script>
@@ -262,7 +262,7 @@ window.onunhandledrejection = function (ev) {
       if (!CAMPOS_FIJOS.includes(k)) filas.push([k, String(v)]);
     $("res-kv").innerHTML = filas.map(([k, v, c]) =>
       `<div class="k">${k}</div><div class="v ${c || ""}">${v}</div>`).join("");
-    agregarHist(d);
+    agregarHist({ caja: d.caja, den, cant });  // valores ya normalizados (nombres completos o abreviados)
   }
   async function procesarTexto(texto) {
     try { setErr("err-scan", ""); mostrar(await descifrar(texto)); }

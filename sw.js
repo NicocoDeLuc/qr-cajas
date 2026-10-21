@@ -1,7 +1,7 @@
 /* Service worker: deja la app completa guardada en el teléfono.
    Estrategia: responde desde caché (funciona sin red) y, si hay red,
    baja la versión nueva en segundo plano para la próxima apertura. */
-const CACHE = "qr-cajas-v7";
+const CACHE = "qr-cajas-v8";
 const PREFIJO = "qr-cajas-v";   // solo se borran cachés viejas de ESTA app (la versión china comparte origen en github.io)
 const ARCHIVOS =["./", "./index.html", "./jsQR.js", "./sjcl.js", "./zxing.js", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
